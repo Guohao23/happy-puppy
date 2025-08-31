@@ -1,15 +1,16 @@
 {
   "name": "小郭多语字幕播放器",
   "short_name": "字幕播放器",
-  "start_url": "./happy-puppy/double.html",
+  "start_url": "/happy-puppy/double.html",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#ff8a00",
   "background_color": "#1a2a6c",
   "icons": [
-    { "src": "puppy2.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/happy-puppy/puppy2.png", "sizes": "512x512", "type": "image/png" }
   ]
 
 }
+
 
 
