@@ -1,7 +1,7 @@
 const CACHE = 'subtitle-player-v1';
 const ASSETS = [
-  './',
-  './index.html',
+  './happy-puppy/',
+  './happy-puppy/index.html',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
 
@@ -26,4 +26,5 @@ self.addEventListener('activate', e => {
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
     )
   );
+
 });
