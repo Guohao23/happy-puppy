@@ -1,4 +1,4 @@
-const CACHE = 'subtitle-player-v1';
+const CACHE = 'happy-puppy';
 const ASSETS = [
   './happy-puppy/',
   './happy-puppy/double.html',
@@ -28,4 +28,5 @@ self.addEventListener('activate', e => {
   );
 
 });
+
 
