@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<title>多语言字幕视频播放器（双入口版）</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+<style>
+
+<!-- 让页面可响应 -->
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- 指向清单文件 -->
+<link rel="manifest" href="manifest.json">
+
+  /* ===== 与原样式基本一致，只把 .video-player 改为占位容器 ===== */
+  *{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif}
+  body{background:linear-gradient(135deg,#1a2a6c,#b21f1f,#fdbb2d);color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px}
+  .container{width:100%;max-width:800px;background:rgba(0,0,0,.7);border-radius:15px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.5);margin-top:20px}
+  header{text-align:center;padding:20px;background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,255,255,.1)}
+  h1{font-size:28px;margin-bottom:10px;background:linear-gradient(to right,#ff8a00,#da1b60);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .tagline{color:#ddd;font-size:16px;margin-bottom: 10px;}
+  .video-container{position:relative;width:100%;padding-top:56.25%;background:#000}
+  .video-player{position:absolute;top:0;left:0;width:100%;height:100%}
+  #local-video{display:none;}   /* 本地 video 默认隐藏 */
+  .video-info{padding:10px 15px;background:rgba(0,0,0,.3);display:flex;justify-content:space-between;font-size:14px}
+  .progress-bar{height:5px;background:rgba(255,255,255,.2);border-radius:5px;overflow:hidden;margin-top:10px}
+  .progress{height:100%;width:0%;background:linear-gradient(to right,#ff8a00,#da1b60);transition:width .3s}
+  .video-controls{display:flex;flex-wrap:wrap;gap:15px;padding:15px;background:rgba(0,0,0,.5)}
+  .control-section{flex:1;min-width:300px}
+  .control-title{font-size:18px;margin-bottom:15px;color:#ff8a00;display:flex;align-items:center}
+  .control-title i{margin-right:10px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(to right,#3498db,#2980b9);color:#fff;border:none;padding:12px 20px;border-radius:50px;margin:0 10px 10px 0;cursor:pointer;font-weight:500;transition:all .3s}
+  .btn:hover{transform:translateY(-2px);box-shadow:0 5px 15px rgba(0,0,0,.3)}
+  .btn-subtitle{background:linear-gradient(to right,#9b59b6,#8e44ad)}
+  .btn-active{box-shadow:0 0 0 3px rgba(255,255,255,.5)}
+  .subtitle-display{margin-top:20px;padding:15px;background:rgba(0,0,0,.3);border-radius:10px;min-height:100px;text-align:center;display:flex;flex-direction:column;justify-content:center}
+  .subtitle-text{font-size:22px;margin-bottom:10px;text-shadow:0 2px 4px rgba(0,0,0,.5)}
+  .subtitle-translation{font-size:18px;color:#ffcc00;font-style:italic}
+  .instructions{padding:25px;background:rgba(0,0,0,.4);margin-top:20px;border-radius:10px;line-height:1.6}
+  .instructions h2{color:#ff8a00;margin-bottom:15px}
+  .instructions ol{padding-left:20px}
+  footer{margin-top:30px;text-align:center;color:rgba(255,255,255,.7);font-size:14px}
+  @media(max-width:600px){.control-section{min-width:100%} h1{font-size:24px} .subtitle-text{font-size:18px} .subtitle-translation{font-size:16px} .btn{padding:10px 15px;font-size:14px}}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>小郭多语言视频播放器（双入口版）</h1>
+    <p class="tagline">支持中英文字幕切换与倍速播放</p>
+
+    <!-- 新增两个入口按钮 -->
+    <p>
+      <input type="file" id="file-input" accept="video/*" style="display:none"/>
+<button class="btn source-btn active" id="btn-local"
+        onclick="selectLocalVideo()">
+  <i class="fas fa-folder-open"></i> 选择本地视频
+<button class="btn source-btn active" id="btn-youtube"
+        onclick="loadYoutubeExample()">
+  <i class="fab fa-youtube"></i> 加载示例视频（YouTube）
+</button>
+</button>
+    </p>
+  </header>
+
+  <!-- 视频显示区域：YouTube 与本地 video 二选一 -->
+  <div class="video-container">
+    <!-- 1. YouTube 播放器 -->
+    <div id="youtube-player" class="video-player"></div>
+    <!-- 2. 本地 video 标签，默认隐藏 -->
+    <video id="local-video" class="video-player" controls></video>
+  </div>
+
+  <div class="video-info">
+    <span id="video-title">示例视频</span>
+    <span id="video-duration">00:00 / 00:00</span>
+  </div>
+  <div class="progress-bar">
+    <div class="progress" id="progress"></div>
+  </div>
+
+  <div class="video-controls">
+    <div class="control-section">
+      <h3 class="control-title"><i class="fas fa-closed-captioning"></i> 字幕选项</h3>
+      <button class="btn btn-subtitle" id="btn-chinese" onclick="switchSubtitle('chinese')">中文</button>
+      <button class="btn btn-subtitle" id="btn-english" onclick="switchSubtitle('english')">英文</button>
+      <button class="btn btn-subtitle" id="btn-both" onclick="switchSubtitle('both')">双语</button>
+      <button class="btn" id="btn-none" onclick="switchSubtitle('none')">关闭字幕</button>
+    </div>
+
+    <div class="control-section">
+      <h3 class="control-title"><i class="fas fa-tachometer-alt"></i> 播放速度</h3>
+      <div>
+	<button class="btn speed-btn" onclick="changeSpeed(0.5)">0.5x</button>
+	<button class="btn speed-btn" onclick="changeSpeed(0.8)">0.8x</button>
+	<button class="btn speed-btn" onclick="changeSpeed(0.9)">0.9x</button>
+	<button class="btn speed-btn active" onclick="changeSpeed(1)">1.0x</button>
+	<button class="btn speed-btn" onclick="changeSpeed(1.5)">1.5x</button>
+	<button class="btn speed-btn" onclick="changeSpeed(2)">2.0x</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="subtitle-display">
+    <p class="subtitle-text" id="main-subtitle">欢迎使用多语言字幕视频播放器</p>
+    <p class="subtitle-translation" id="translation-subtitle">Welcome to the Multi-Language Subtitle Video Player</p>
+  </div>
+
+  <div class="instructions">
+    <h2>使用说明</h2>
+    <ol>
+      <li>点击“选择本地视频文件”可播放本地视频。</li>
+      <li>点击“加载示例视频（YouTube）”可切回 YouTube 示例。</li>
+      <li>字幕切换与倍速功能对两种视频均生效。</li>
+    </ol>
+  </div>
+</div>
+
+<footer>© 2024 多语言字幕视频播放器 | 双入口版</footer>
+
+<!-- YouTube IFrame API -->
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+  /* ============ 字幕数据 ============ */
+  const subtitles = {
+    chinese: [
+      { start: 0,   end: 5,   text: "欢迎使用多语言字幕视频播放器" },
+      { start: 5,   end: 10,  text: "这是一个支持中英文字幕切换的应用" },
+      { start: 10,  end: 15,  text: "现在您可以体验字幕切换功能" },
+      { start: 15,  end: 20,  text: "以及倍速播放功能" }
+    ],
+    english: [
+      { start: 0,   end: 5,   text: "Welcome to the Multi-Language Subtitle Video Player" },
+      { start: 5,   end: 10,  text: "This app supports switching between Chinese and English subtitles" },
+      { start: 10,  end: 15,  text: "Now you can experience subtitle switching" },
+      { start: 15,  end: 20,  text: "And playback speed control" }
+    ]
+  };
+
+  /* ============ 全局变量 ============ */
+  let player;            // YouTube 实例
+  let currentVideo = 'youtube';   // 'youtube' | 'local'
+  let subtitleState = 'both';
+  let tickInterval;
+
+  /* ============ 入口函数 ============ */
+  function selectLocalVideo() {
+    document.getElementById('file-input').click();
+  }
+  document.getElementById('file-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    switchToLocal(file);
+  });
+
+  function loadYoutubeExample() {
+    switchToYoutube();
+  }
+
+  /* ============ 切换逻辑 ============ */
+  function switchToLocal(file) {
+    if (currentVideo === 'local') return;
+    if (player && player.destroy) player.destroy();   // 销毁 YouTube
+    const localVideo = document.getElementById('local-video');
+    localVideo.src = URL.createObjectURL(file);
+    localVideo.style.display = 'block';
+    document.getElementById('youtube-player').style.display = 'none';
+    document.getElementById('video-title').textContent = file.name;
+    currentVideo = 'local';
+    bindLocalEvents();
+    switchSubtitle('both');
+
+/* === 新增：高亮“选择本地视频”按钮 === */
+  document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('btn-active'));
+  document.getElementById('btn-local').classList.add('btn-active');
+  }
+
+  function switchToYoutube() {
+    if (currentVideo === 'youtube') return;
+    const localVideo = document.getElementById('local-video');
+    if (localVideo.src) URL.revokeObjectURL(localVideo.src);
+    localVideo.style.display = 'none';
+    document.getElementById('youtube-player').style.display = 'block';
+    document.getElementById('video-title').textContent = '示例视频';
+    currentVideo = 'youtube';
+    // YouTube API 会在 onYouTubeIframeAPIReady 里自动重建
+    if (!window.YT || !YT.Player) {
+      // 如果脚本未加载，重新插入
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      document.head.appendChild(tag);
+    } else {
+      onYouTubeIframeAPIReady(); // 直接重建
+    }
+
+ /* === 新增：高亮“加载示例视频”按钮 === */
+  document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('btn-active'));
+  document.getElementById('btn-youtube').classList.add('btn-active');
+  }
+
+  /* ============ YouTube IFrame API 回调 ============ */
+  function onYouTubeIframeAPIReady() {
+    player = new YT.Player('youtube-player', {
+      videoId: 'iyumxyv1RD4',
+      playerVars: { autoplay: 0, controls: 1, modestbranding: 1, rel: 0 },
+      events: { onReady: onPlayerReady, onStateChange: onPlayerStateChange }
+    });
+  }
+  function onPlayerReady() {
+    updateDuration();
+    startSubtitles();
+    switchSubtitle('both');
+  }
+  function onPlayerStateChange(e) {
+    if (e.data === YT.PlayerState.PLAYING) {
+      tickInterval = setInterval(tick, 100);
+    } else {
+      clearInterval(tickInterval);
+    }
+  }
+
+  /* ============ 本地 video 事件绑定 ============ */
+  function bindLocalEvents() {
+    const v = document.getElementById('local-video');
+    v.addEventListener('loadedmetadata', () => {
+      updateDuration();
+      switchSubtitle('both');
+    });
+    v.addEventListener('play', () => { tickInterval = setInterval(tick, 100); });
+    v.addEventListener('pause', () => clearInterval(tickInterval));
+    v.addEventListener('ended', () => clearInterval(tickInterval));
+  }
+
+  /* ============ 通用工具 ============ */
+  function formatTime(sec) {
+    const mins = Math.floor(sec / 60);
+    const secs = Math.floor(sec % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  function tick() {
+    updateSubtitlesBasedOnTime();
+    updateDuration();
+  }
+
+  function updateDuration() {
+    if (currentVideo === 'youtube') {
+      if (!player || !player.getDuration) return;
+      const cur = player.getCurrentTime();
+      const dur = player.getDuration();
+      document.getElementById('video-duration').textContent =
+        `${formatTime(cur)} / ${formatTime(dur)}`;
+      document.getElementById('progress').style.width = (cur / dur * 100) + '%';
+    } else {
+      const v = document.getElementById('local-video');
+      document.getElementById('video-duration').textContent =
+        `${formatTime(v.currentTime)} / ${formatTime(v.duration || 0)}`;
+      document.getElementById('progress').style.width = (v.currentTime / v.duration * 100) + '%';
+    }
+  }
+
+  /* ============ 字幕逻辑（与之前一致，但需区分两种播放器） ============ */
+  function switchSubtitle(lang) {
+    subtitleState = lang;
+    document.querySelectorAll('.btn-subtitle, .btn').forEach(b => b.classList.remove('btn-active'));
+    document.getElementById('btn-' + lang).classList.add('btn-active');
+    updateSubtitlesBasedOnTime();
+  }
+
+  function updateSubtitlesBasedOnTime() {
+    let t = 0;
+    if (currentVideo === 'youtube') {
+      if (!player || !player.getCurrentTime) return;
+      t = player.getCurrentTime();
+    } else {
+      t = document.getElementById('local-video').currentTime;
+    }
+
+    let zh = '', en = '';
+    for (let i = 0; i < subtitles.chinese.length; i++) {
+      if (t >= subtitles.chinese[i].start && t < subtitles.chinese[i].end) {
+        zh = subtitles.chinese[i].text;
+        en = subtitles.english[i].text;
+        break;
+      }
+    }
+    const main = document.getElementById('main-subtitle');
+    const trans = document.getElementById('translation-subtitle');
+    switch (subtitleState) {
+      case 'chinese':  main.textContent = zh; trans.textContent = ''; break;
+      case 'english':  main.textContent = en; trans.textContent = ''; break;
+      case 'both':     main.textContent = zh; trans.textContent = en; break;
+      case 'none':     main.textContent = ''; trans.textContent = ''; break;
+    }
+  }
+
+  function startSubtitles() {
+    clearInterval(tickInterval);
+    tickInterval = setInterval(tick, 100);
+  }
+
+  /* ============ 倍速控制 ============ */
+function changeSpeed(rate) {
+document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('btn-active'));
+const target = Array.from(document.querySelectorAll('.speed-btn'))
+                      .find(b => b.textContent.trim() === rate.toFixed(1) + 'x');
+  if (target) target.classList.add('btn-active');
+  if (currentVideo === 'youtube') {
+    player.setPlaybackRate(rate);
+  } else {
+    document.getElementById('local-video').playbackRate = rate;
+  }
+}
+</script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      // 页面加载完成后注册，避免阻塞
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js');
+      });
+    }
+  </script>
+</body>
+</html>
